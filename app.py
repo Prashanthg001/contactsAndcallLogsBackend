@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
+import random
+import string
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -22,6 +24,10 @@ class CallLog(db.Model):
     call_type = db.Column(db.String(50))
     duration = db.Column(db.Integer)
     timestamp = db.Column(db.String(50))
+    unique_id = db.Column(db.String(8), unique=True)
+
+def generate_unique_id():
+    return ''.join(random.choices(string.digits, k=8))
 
 @app.route('/api/save_data', methods=['POST'])
 def save_data():
@@ -43,7 +49,8 @@ def save_data():
             number=log['number'],
             call_type=log['callType'],
             duration=log['duration'],
-            timestamp=datetime.fromtimestamp(log['timestamp'] / 1000).isoformat() if log['timestamp'] else None
+            timestamp=datetime.fromtimestamp(log['timestamp'] / 1000).isoformat() if log['timestamp'] else None,
+            unique_id=generate_unique_id()
         )
         db.session.add(new_log)
 
@@ -54,6 +61,13 @@ def save_data():
 def call_logs():
     logs = CallLog.query.all()
     return render_template('call_logs.html', call_logs=logs)
+
+@app.route('/delete_call_log/<int:id>', methods=['POST'])
+def delete_call_log(id):
+    log = CallLog.query.get_or_404(id)
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({'message': 'Call log deleted successfully'}), 200
 
 if __name__ == '__main__':
     with app.app_context():
